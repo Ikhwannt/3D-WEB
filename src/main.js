@@ -7,7 +7,8 @@ import {
     DirectionalLight,
     PointLight,
     SpotLight,
-    ShadowGenerator
+    ShadowGenerator,
+    ActionManager
 } from "@babylonjs/core";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
 import { SceneLoader } from "@babylonjs/core/Loading/sceneLoader"; 
@@ -19,7 +20,7 @@ const engine = new Engine(canvas, true);
 const scene = new Scene(engine);
 
 // Kamera mengelilingi objek
-const camera = new ArcRotateCamera("camera", Math.PI / 2, Math.PI / 4, 10, Vector3.Zero(), scene);
+const camera = new ArcRotateCamera("camera", Math.PI / 2, Math.PI / 4, 15, Vector3.Zero(), scene);
 camera.attachControl(canvas, true);
 
 scene.clearColor = new Color3(0.02, 0.02, 0.08); // gelap
@@ -55,56 +56,63 @@ const shadowGenerator = new ShadowGenerator(1024, spotLight);
 shadowGenerator.useBlurExponentialShadowMap = true;
 shadowGenerator.blurKernel = 32;
 
+let porsche; // mesh variable
+
+// For tracking keyboard input
+const inputMap = {};
+window.addEventListener("keydown", (evt) => {
+    inputMap[evt.key.toLowerCase()] = true;
+});
+window.addEventListener("keyup", (evt) => {
+    inputMap[evt.key.toLowerCase()] = false;
+});
+
 const loadModel = async () => {
     const result = await SceneLoader.ImportMeshAsync("", "models/", "scene.gltf", scene);
-    const porsche = result.meshes[0]; // ambil mesh utama
+    porsche = result.meshes[0]; // ambil mesh utama
 
-    // Reset posisi awal (opsional)
+    // Reset posisi awal
     porsche.position = new Vector3(3, 0, 0);
 
     // Terima bayangan dan aktifkan cast shadow
-     porsche.receiveShadows = true;
-     shadowGenerator.addShadowCaster(porsche, true);
+    porsche.receiveShadows = true;
+    shadowGenerator.addShadowCaster(porsche, true);
 
-    // Animasi gerakan maju di sumbu Z
-    const moveForward = new Animation(
-        "moveForward",
-        "position.z",
-        30, // 30 fps
-        Animation.ANIMATIONTYPE_FLOAT,
-        Animation.ANIMATIONLOOPMODE_CYCLE // supaya looping
-    );
-
-    // Buat mobil jalan dari -50 ke 50, lalu kembali ke -50 (loop)
-    const keyFrames = [
-        { frame: 0, value: -50 },
-        { frame: 150, value: 50 } // jalan 50 satuan dalam 5 detik (30x5 = 150)
-    ];
-
-    moveForward.setKeys(keyFrames);
-
-    // Tambahkan animasi ke mobil
-    porsche.animations = [moveForward];
-
-    // Mulai animasi
-    scene.beginAnimation(porsche, 0, 150, true); // true = looping
+    // Add interaction to porsche mesh
+    porsche.actionManager = new ActionManager(scene);
+    
 };
 
 const loadRoad = async () => {
     const result = await SceneLoader.ImportMeshAsync("", "roads/", "road.gltf", scene);
     const road = result.meshes[0]; // mesh utama
-  
-    // Atur posisi agar berada di bawah mobil, misalnya
+    // Atur posisi agar berada di bawah mobil, misalnya  
     road.position = new Vector3(0, 0, 0);
-  
-    // Skala kalau terlalu kecil/besar
-    road.scaling = new Vector3(0.5,0.5,0.5);
-
-    // Biar jalan terima bayangan
+    road.scaling = new Vector3(0.5, 0.5, 0.5);
     road.receiveShadows = true;
-  };
+};
 
 loadModel();
 loadRoad();
 
-engine.runRenderLoop(() => scene.render());
+const moveSpeed = 0.2;
+
+engine.runRenderLoop(() => {
+    // gerakan mobilnya berdasarkan input WASD
+    if(porsche) {
+        if(inputMap["s"]) {
+            porsche.position.z -= moveSpeed;
+        }
+        if(inputMap["w"]) {
+            porsche.position.z += moveSpeed;
+        }
+        if(inputMap["a"]) {
+            porsche.position.x -= moveSpeed;
+        }
+        if(inputMap["d"]) {
+            porsche.position.x += moveSpeed;
+        }
+    }
+    scene.render();
+});
+
